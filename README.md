@@ -1,4 +1,3 @@
-# arenaWar
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -7,6 +6,7 @@ using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Runtime.Remoting.Metadata.W3cXsd2001;
 using System.Security.Claims;
 using System.Text;
@@ -17,61 +17,58 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace ConsoleApp2
 {
+    //       Файловые подсказки
+    //
     //индекс героя 0
     //индекс противника 1
-
+    //
     //индекс серезбряного мечя 0
     //индекс шлема 1
     //индекс нагрудника 2
     //индекс креста бога 3
     //индекс берсерк амулета 4
     //индекс магического плаща 5
-
+    //
+    //индекс арены 0
+    //
     //ширина сущностей 5
     //ширина предметов 16
-    
+    //ширина арены 18
+
     internal class Program
     {
         static void Main(string[] args)
         {
-            char[,] structureArena = ReadFile("arena.txt");
-            char[,] entityFile = ReadFile("entity.txt");
-            char[,] itemsFile = ReadFile("items.txt");
             int heroMaxHealth = 100;
             int heroHealth = heroMaxHealth;
-            int heroDamage = 50;
+            int heroDamage = 40;
             int heroArmor = 0;
-            int level = 1;
+            int level = 1;           
             bool openGame = true;
 
-
+            
             ItemList listItems = new ItemList();
-            Arena arena = new Arena();
             List<Item> items = listItems.CreatingListOfItems();
-            List<char[,]> entitySprites = SplittingSprites(entityFile, 5);
-            List<char[,]> itemsSpites = SplittingSprites(itemsFile, 16);
 
-            Hero hero = new Hero(entitySprites[0], heroHealth, heroMaxHealth, heroDamage, heroArmor, level);
-            Enemy enemy = new Enemy(entitySprites[1]);
-
+            Hero hero = new Hero( heroHealth, heroMaxHealth, heroDamage, heroArmor, level);
+            Enemy enemy = new Enemy();
 
             while (openGame)
             {
-                arena.DrawArena(structureArena);
-                arena.DrawSprite(hero.Form, 3, 2);
-                arena.DrawSprite(enemy.Form, 10, 2);
+                Console.CursorVisible = false;
                 enemy.CreatingParameters(hero.Level, hero.Health);
-                Console.SetCursorPosition(0, 10);
                 while (hero.Health > 0 && enemy.Health > 0)
                 {
-                    enemy.TakeDamage(hero.Damage);
+                    DrawInterface(hero, enemy);
+                    Console.SetCursorPosition(0, 12);
                     hero.TakeDamage(enemy.Damage);
-                    Console.WriteLine(hero.Health);
-                    Console.WriteLine(enemy.Health);
+                    enemy.TakeDamage(hero.Damage);
                     Console.ReadKey();
+                    Console.Clear();
                 }
                 if (hero.Health > 0)
                 {
+                    Console.SetCursorPosition(0, 0);
                     hero.LevelUp();
                     Console.WriteLine("Win");
                     if (items.Count >= 3)
@@ -84,6 +81,7 @@ namespace ConsoleApp2
                     }
                     hero.Health = hero.MaxHealth;
                 }
+                Console.Clear();
             }
         }
 
@@ -126,47 +124,27 @@ namespace ConsoleApp2
 
         }
 
-
-        static char[,] ReadFile(string path)
+        static void DrawInterface(Hero hero, Enemy enemy)
         {
-            string[] fileString = File.ReadAllLines(path);
+            int arenaPosX = 1;
+            int arenaPosY = 1;
+            ArenaSprite arenaSprite = new ArenaSprite("arena.txt", arenaPosX, arenaPosY);
+            
+            EntitySprite heroSprite = new EntitySprite("entity.txt", 0, arenaSprite.PosX + 3, arenaSprite.PosY + 2);
+            EntitySprite enemySprite = new EntitySprite("entity.txt", 1, arenaSprite.PosX + 10, arenaSprite.PosY + 2);
 
-            char[,] fileChar = new char[fileString[0].Length, fileString.Length];
+            int barsPosX = arenaSprite.Width + arenaPosX + 1;
+            int barsPosY = 1;
+            BarsSprites heroHPbars = new BarsSprites(10);
 
-            for (int y = 0; y < fileChar.GetLength(0); y++)
-            {
-                for (int x = 0; x < fileChar.GetLength(1); x++)
-                {
-                    fileChar[y, x] = fileString[x][y];
-                }
-            }
-            return fileChar;
+            arenaSprite.DrawInterface();
+            heroSprite.DrawInterface();
+            enemySprite.DrawInterface();
+            heroHPbars.DrawBar(hero.Health, hero.MaxHealth, barsPosX, barsPosY, ConsoleColor.Green, ConsoleColor.Red);
         }
-
-        static List<char[,]> SplittingSprites( char[,] spritePack, int width)
-        {
-            List<char[,]> listSprite = new List<char[,]>();
-
-            int range = width;
-            int n = 0;
-            for (int i = 0; i < spritePack.GetLength(0) / width; i++)
-            {
-            char[,] sprite = new char[width, spritePack.GetLength(1)];
-                for (int y = 0; y < spritePack.GetLength(1); y++)
-                {
-                    for (int x = range - width; x < range; x++)
-                    {
-                        sprite[x - n, y] = spritePack[x, y];
-                    }
-                }
-                n += width;
-                range += width;
-                listSprite.Add(sprite);
-            }
-            return listSprite;
-        }
-
         
+
+
     }
 
     class ItemList
@@ -198,66 +176,7 @@ namespace ConsoleApp2
 
         public virtual void PassiveBonus(ref Hero hero, ref Enemy enemy) { }
     }
-    class Hero
-    {
-        public char[,] Form;
-        public int Health;
-        public int MaxHealth;
-        public int Damage;
-        public int Armor;
-        public int Level;
-        
-        public Hero(char[,] form, int health,int maxHealth, int damage, int armor, int level )
-        {
-            Form = form;
-            Health = health;
-            MaxHealth = maxHealth;
-            Damage = damage;
-            Armor = armor;
-            Level = level;
-        }
 
-        public void TakeDamage(int incomingDamage)
-        {
-            Health -= incomingDamage * (100 - Armor)/100; 
-        }
-
-        public void LevelUp()
-        {
-            ChangingStats upStat = new ChangingStats();
-            Level++;
-            int upDamage = Level * 5;
-            upStat.UpingDamage(ref Damage, upDamage);
-            upStat.UpingHealth(ref MaxHealth, Level * 20);
-            
-        }
-        
-    }
-    
-    class Enemy
-    {
-        public char[,] Form;
-        public int Health;
-        public int Damage;
-        public int Armor;
-        public Enemy(char[,] form)
-        {
-            Form = form;
-        }
-        public void CreatingParameters(int heroLevel, int heroHealth)
-        {
-            Random rend = new Random();
-            Health = rend.Next(100, 100);//heroHealth - 10, heroHealth + (heroLevel * 10));
-            Damage = rend.Next(10,10);
-            Armor = rend.Next(0,0);
-        } 
-        public void TakeDamage(int incomingDamage)
-        {
-            Health -= incomingDamage * (100 - Armor) / 100;
-        }
-
-    }
-    
     class SilverSword : Item
     {
         public SilverSword()
@@ -265,16 +184,16 @@ namespace ConsoleApp2
             Name = "Серебряный меч";
         }
 
-        public void DeafoultPassiveBonusSilverSword(ref int heroDamage, ref int enemyArmor) 
+        public void DeafoultPassiveBonusSilverSword(ref int heroDamage, ref int enemyArmor)
         {
             DamageUp = 10;
             ChangingStats changStat = new ChangingStats();
             changStat.UpingDamage(ref heroDamage, DamageUp);
         }
-        public override void PassiveBonus(ref Hero hero,ref Enemy enemy)
+        public override void PassiveBonus(ref Hero hero, ref Enemy enemy)
         {
             DeafoultPassiveBonusSilverSword(ref hero.Damage, ref enemy.Armor);
-            
+
         }
     }
     class LeatherHelmet : Item
@@ -337,7 +256,7 @@ namespace ConsoleApp2
     }
 
     class DvineCross : Item
-    { 
+    {
         public DvineCross()
         {
             Name = "Божественный крест";
@@ -359,7 +278,7 @@ namespace ConsoleApp2
     }
 
     class MagicCloak : Item
-    { 
+    {
         public MagicCloak()
         {
             Name = "Магический плащ";
@@ -413,33 +332,169 @@ namespace ConsoleApp2
         }
     }
 
-    class Arena
+    class Interface
     {
-        public void DrawArena(char[,] arena)
+        public char[,] Sprite;
+        public int PosX;
+        public int PosY;
+        public int Width;
+        public int IndexInFile;
+        public Interface(string fileSprites, int width, int indexSprite, int posX, int posY)
         {
-            Console.SetCursorPosition(0, 0);
-            for (int y = 0; y < arena.GetLength(1); y++)
+            Sprite = SplittingSprites(ReadFile(fileSprites), width)[indexSprite];
+            PosX = posX;
+            PosY = posY;
+            Width = width;
+            IndexInFile = indexSprite;
+        }
+        char[,] ReadFile(string path)
+        {
+            string[] fileString = File.ReadAllLines(path);
+
+            char[,] fileChar = new char[fileString[0].Length, fileString.Length];
+
+            for (int y = 0; y < fileChar.GetLength(0); y++)
             {
-                for (int x = 0; x < arena.GetLength(0); x++)
+                for (int x = 0; x < fileChar.GetLength(1); x++)
                 {
-                        Console.Write(arena[x, y]);
+                    fileChar[y, x] = fileString[x][y];
                 }
-                Console.WriteLine();
             }
+            return fileChar;
+        }
+        List<char[,]> SplittingSprites(char[,] spritePack, int width)
+        {
+            List<char[,]> listSprite = new List<char[,]>();
+
+            int range = width;
+            int n = 0;
+            for (int i = 0; i < spritePack.GetLength(0) / width; i++)
+            {
+                char[,] sprite = new char[width, spritePack.GetLength(1)];
+                for (int y = 0; y < spritePack.GetLength(1); y++)
+                {
+                    for (int x = range - width; x < range; x++)
+                    {
+                        sprite[x - n, y] = spritePack[x, y];
+                    }
+                }
+                n += width;
+                range += width;
+                listSprite.Add(sprite);
+            }
+            return listSprite;
         }
 
-        public void DrawSprite(char[,] sprite, int indentRight, int indentDown)
+        public void DrawInterface()
         {
-            int y;
-            int x;
-            for (y = 0; y < sprite.GetLength(1); y++)
+            for (int y = 0; y < Sprite.GetLength(1); y++)
             {
-                Console.SetCursorPosition(indentRight, indentDown + y); 
-                for (x = 0; x < sprite.GetLength(0); x++)
+                Console.SetCursorPosition(PosX, PosY + y);
+                for (int x = 0; x < Sprite.GetLength(0); x++)
                 {
-                    Console.Write(sprite[x, y]);
+                    Console.Write(Sprite[x, y]);
                 }
             }
         }
+    }
+
+    class ArenaSprite : Interface
+    {
+        public ArenaSprite(string fileSprites, int posX, int posY) : base(fileSprites, 18, 0, posX, posY) { }
+
+    }
+
+    class EntitySprite : Interface
+    {
+        public EntitySprite(string fileSprites, int indexSprite, int posX, int posY) : base(fileSprites, 5, indexSprite, posX, posY) { }
+    }
+
+    class BarsSprites
+    {
+        public List<char> Sprite;
+
+        public BarsSprites(int lengthBar)
+        {
+            Sprite = new List<char>(lengthBar + 2);
+            Sprite.Add('[');
+            for (int i = 0; i < lengthBar; i++)
+            {
+                Sprite.Add('█');
+            }
+            Sprite.Add(']');
+        }
+
+        public void DrawBar(int positivePoints, int maxPoint, int posX, int posY, ConsoleColor colorLeft, ConsoleColor colorRight)
+        {
+            Console.SetCursorPosition(posX, posY);
+            Console.Write(Sprite[0]);
+            Console.ForegroundColor = colorLeft;
+            for (int i = 0; i < Convert.ToSingle(positivePoints) / maxPoint * 10; i++)
+            {
+                Console.Write(Sprite[1]);
+            }
+            Console.ForegroundColor = colorRight;
+            for (int j = 0; j < Sprite.Count - (Convert.ToSingle(positivePoints) / maxPoint * 10) - 2; j++)
+            {
+                Console.Write(Sprite[1]);
+            }
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write(Sprite[Sprite.Count - 1] + $" {positivePoints}/{maxPoint}");
+
+
+        }
+    }
+
+    class Hero
+    {
+        public int Health;
+        public int MaxHealth;
+        public int Damage;
+        public int Armor;
+        public int Level;
+
+        public Hero( int health, int maxHealth, int damage, int armor, int level)
+        {
+            Health = health;
+            MaxHealth = maxHealth;
+            Damage = damage;
+            Armor = armor;
+            Level = level;
+        }
+
+        public void TakeDamage(int incomingDamage)
+        {           
+            Health -= incomingDamage * (100 - Armor) / 100;
+        }
+
+        public void LevelUp()
+        {
+            ChangingStats upStat = new ChangingStats();
+            Level++;
+            int upDamage = Level * 5;
+            upStat.UpingDamage(ref Damage, upDamage);
+            upStat.UpingHealth(ref MaxHealth, Level * 20);
+
+        }
+
+    }
+
+    class Enemy
+    {
+        public int Health;
+        public int Damage;
+        public int Armor;
+        public void CreatingParameters(int heroLevel, int heroHealth)
+        {
+            Random rend = new Random();
+            Health = rend.Next(100, 100);//heroHealth - 10, heroHealth + (heroLevel * 10));
+            Damage = rend.Next(10, 10);
+            Armor = rend.Next(0, 0);
+        }
+        public void TakeDamage(int incomingDamage)
+        {
+            Health -= incomingDamage * (100 - Armor) / 100;
+        }
+
     }
 }
